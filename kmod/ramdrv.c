@@ -176,19 +176,27 @@ static int __init ramdrv_init(void) {
   ramdrv_sbull_dev = kmalloc(sizeof(struct sbull_dev), GFP_KERNEL);
   memset(ramdrv_sbull_dev, 0, sizeof(struct sbull_dev));
 
+
+  printk(KERN_NOTICE "ramdrv: initialized sbull struct\n");
+
   ramdrv_sbull_dev->media_change = 0;
   ramdrv_sbull_dev->users = 0;
   ramdrv_sbull_dev->size = sector_count * KERNEL_SECTOR_SIZE;
   ramdrv_sbull_dev->data = vmalloc(ramdrv_sbull_dev->size); //allocate virtual disk size
+
   if (ramdrv_sbull_dev->data == NULL){
     printk(KERN_WARNING "ramdr: unable to valloc memory\n");
     goto vfree_out;
   }
+  printk(KERN_NOTICE "ramdrv: valloced!\n");
+
   spin_lock_init(&(ramdrv_sbull_dev->lock));
 
   init_timer(&ramdrv_sbull_dev->timer);
 	ramdrv_sbull_dev->timer.data = (unsigned long) ramdrv_sbull_dev;
 	ramdrv_sbull_dev->timer.function = sbull_invalidate;
+
+  printk(KERN_NOTICE "ramdrv: timered!\n");
 
   ramdrv_sbull_dev->queue = blk_init_queue(sbull_request, &(ramdrv_sbull_dev->lock));
   if (!(ramdrv_sbull_dev->queue)){
