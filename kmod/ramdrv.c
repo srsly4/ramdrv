@@ -99,7 +99,7 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 // Device request handler
 static void sbull_request(struct request_queue *queue){
   struct request *req;
-
+  int ret;
   //get anything from the queue
   while ((req = blk_fetch_request(queue)) != NULL){
     struct sbull_dev *dev = req->rq_disk->private_data;
@@ -109,12 +109,18 @@ static void sbull_request(struct request_queue *queue){
     if (req == NULL || req->cmd_type != REQ_TYPE_FS) {
 #endif
       printk(KERN_NOTICE "Skipped non-fs request \n");
-      __blk_end_request_all(req, -EIO);
-      continue;
+      ret = -EIO;
+      goto done;
     }
     //move the data
-    sbull_transfer(dev, blk_rq_pos(req), blk_rq_sectors(req), req->completion_data, rq_data_dir(req));
-    __blk_end_request_all(req, 1);
+    printk(KERN_NOTICE "Normal request");
+    sbull_transfer(dev, blk_rq_pos(req), blk_rq_cur_sectors(req), bio_data(req->bio), rq_data_dir(req));
+    ret = 0;
+
+    done:
+    if (!__blk_end_request_cur(req, ret)){
+			req = blk_fetch_request(queue);
+		}
   }
 }
 

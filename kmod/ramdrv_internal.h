@@ -20,7 +20,6 @@ struct sbull_dev {
         spinlock_t lock;                /* For mutual exclusion */
         struct request_queue *queue;    /* The device request queue */
         struct gendisk *gd;             /* The gendisk structure */
-        struct timer_list timer;        /* For simulated media changes */
 };
 
 #endif

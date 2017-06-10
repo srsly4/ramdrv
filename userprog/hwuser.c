@@ -26,7 +26,7 @@ struct user_params Params = {
 
 
 /**
- *  This subroutine processes the command line options 
+ *  This subroutine processes the command line options
  */
 void process_options (int argc, char *argv[])
 {
@@ -97,12 +97,10 @@ int main(int argc, char** argv){
     printf("INCREMENT=%d\n", Params.increment);
 
     for (i = 0; i < Params.increment; i++) {
-
         if (ramdrv_inc(fd)) {
             printf("There was an error calling ramdrv_inc().\n");
             exit(EXIT_FAILURE);
         }
-
     }
 
 
