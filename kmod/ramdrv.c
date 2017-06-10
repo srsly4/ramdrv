@@ -30,8 +30,8 @@ module_param(sector_count, int, 0);
 static int blkdev_id;
 
 static int sbull_open(struct block_device *dev, fmode_t mode){
-  pritnk(KERN_NOTICE "sbull opening!\n");
   struct sbull_dev *sdev = dev->bd_disk->private_data;
+  printk(KERN_NOTICE "sbull opening!\n");
 
   del_timer_sync(&sdev->timer);
 
@@ -44,8 +44,8 @@ static int sbull_open(struct block_device *dev, fmode_t mode){
 }
 
 static void sbull_release(struct gendisk *disk, fmode_t mode){
-  printk(KERN_NOTICE "sbull releasing!\n");
   struct sbull_dev *sdev = disk->private_data;
+  printk(KERN_NOTICE "sbull releasing!\n");
 
   spin_lock(&sdev->lock);
   sdev->users--;
@@ -164,7 +164,7 @@ static int __init ramdrv_init(void) {
   ramdrv_sbull_dev = kmalloc(sizeof(struct sbull_dev), GFP_KERNEL);
   memset(ramdrv_sbull_dev, 0, sizeof(struct sbull_dev));
 
-  ramdrv_sbull_dev->media_changed = 0;
+  ramdrv_sbull_dev->media_change = 0;
   ramdrv_sbull_dev->users = 0;
   ramdrv_sbull_dev->size = sector_count * KERNEL_SECTOR_SIZE;
   ramdrv_sbull_dev->data = vmalloc(ramdrv_sbull_dev->size); //allocate virtual disk size
