@@ -21,7 +21,7 @@
 
 
 /* Module params */
-static int sector_count = 262144; // 128MB
+static int sector_count = 65536; // 128MB
 module_param(sector_count, int, 0);
 
 
@@ -36,7 +36,6 @@ static int sbull_open(struct block_device *dev, fmode_t mode){
   sdev->users++;
   spin_unlock(&sdev->lock);
 
-  printk(KERN_NOTICE "sbull opened!\n");
   return 0;
 }
 
@@ -48,7 +47,6 @@ static void sbull_release(struct gendisk *disk, fmode_t mode){
   sdev->users--;
 
   spin_unlock(&sdev->lock);
-  printk(KERN_NOTICE "sbull released!\n");
 }
 
 static int sbull_media_changed(struct gendisk *gd){
@@ -102,6 +100,7 @@ static void sbull_request(struct request_queue *queue){
   int ret;
   //get anything from the queue
   while ((req = blk_fetch_request(queue)) != NULL){
+    printk(KERN_NOTICE "Fetched request\n")
     struct sbull_dev *dev = req->rq_disk->private_data;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
     if (req == NULL || (!(req->cmd_flags & REQ_OP_WRITE) && !(req->cmd_flags & REQ_OP_READ))) { //if it's not from-disk or to-disk request
@@ -113,7 +112,7 @@ static void sbull_request(struct request_queue *queue){
       goto done;
     }
     //move the data
-    printk(KERN_NOTICE "Normal request");
+    printk(KERN_NOTICE "Normal request\n");
     sbull_transfer(dev, blk_rq_pos(req), blk_rq_cur_sectors(req), bio_data(req->bio), rq_data_dir(req));
     ret = 0;
 
@@ -198,6 +197,7 @@ static int __init ramdrv_init(void) {
   ramdrv_sbull_dev->gd->queue = ramdrv_sbull_dev->queue;
   ramdrv_sbull_dev->gd->private_data = (void*)ramdrv_sbull_dev;
   snprintf(ramdrv_sbull_dev->gd->disk_name, 32, "ramdrv");
+
   set_capacity(ramdrv_sbull_dev->gd, sector_count);
   add_disk(ramdrv_sbull_dev->gd);
 
