@@ -10,5 +10,13 @@ userprog/CMakeFiles
 CMakeCache.txt
 CMakeFiles
 *.symvers
-*.orders
+*.order
 *.mod.c
+lib/cmake_install.cmake
+lib/libramdrv.so
+lib/Makefile
+userprog/cmake_install.cmake
+userprog/hwuser
+userprog/Makefile
+cmake_install.cmake
+*.cmake
