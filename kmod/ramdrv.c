@@ -91,9 +91,38 @@ static int sbull_ioctl(struct block_device *dev, fmode_t mode,
   return -ENOTTY;
 }
 
+// Device transfer request delivery
+static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
+        unsigned long nsect, char *buffer, int write) {
+  unsigned long offset = sector*KERNEL_SECTOR_SIZE;
+  unsigned long nbytes = nsect*KERNEL_SECTOR_SIZE;
+
+  if ((offset + nbytes) > dev->size) {
+    printk (KERN_NOTICE "ramdrv: Wrong offset! (%ld %ld)\n", offset, nbytes);
+    return;
+  }
+  if (write)
+    memcpy(dev->data + offset, buffer, nbytes);
+  else
+    memcpy(buffer, dev->data + offset, nbytes);
+}
+
 // Device request handler
-static void sbull_request(struct request_queue *q){
-  return;
+static void sbull_request(struct request_queue *queue){
+  struct request *req;
+
+  //get anything from the queue
+  while ((req = blk_fetch_request(queue)) != NULL){
+    struct sbull_dev *dev = req->rq_disk->private_data;
+    if (req == NULL || (!(req->cmd_flags & REQ_OP_WRITE) && !(req->cmd_flags & REQ_OP_READ))) { //if it's not from-disk or to-disk request
+      printk(KERN_NOTICE "Skipped non-fs request \n");
+      __blk_end_request_all(req, -EIO);
+      continue;
+    }
+    //move the data
+    sbull_transfer(dev, blk_rq_pos(req), blk_rq_sectors(req), req->completion_data, rq_data_dir(req));
+    __blk_end_request_all(req, 1);
+  }
 }
 
 // Device operations handler
@@ -123,7 +152,7 @@ static int __init ramdrv_init(void) {
     goto out;
   }
 
-  printk("ramdrv: initialized block device");
+  printk("ramdrv: initialized block device\n");
 
   //fill the sbull_dev struct
   ramdrv_sbull_dev = kmalloc(sizeof(struct sbull_dev), GFP_KERNEL);
@@ -157,7 +186,7 @@ static int __init ramdrv_init(void) {
   ramdrv_sbull_dev->gd->fops = &ramdrv_blkops;
   ramdrv_sbull_dev->gd->queue = ramdrv_sbull_dev->queue;
   ramdrv_sbull_dev->gd->private_data = (void*)ramdrv_sbull_dev;
-  snprintf(ramdrv_sbull_dev->gd->disk_name, 32, "ramdrv%c", 'a' + which);
+  snprintf(ramdrv_sbull_dev->gd->disk_name, 32, "ramdrv");
   set_capacity(ramdrv_sbull_dev->gd, sector_count * (logical_block_size / KERNEL_SECTOR_SIZE));
   add_disk(ramdrv_sbull_dev->gd);
 
