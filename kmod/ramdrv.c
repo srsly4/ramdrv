@@ -29,24 +29,28 @@ module_param(sector_count, int, 0);
 static int blkdev_id;
 
 static int sbull_open(struct block_device *dev, fmode_t mode){
-  struct sbull_dev *sdev = dev->bd_disk->private_data;
+  struct sbull_dev *sdev;
   printk(KERN_NOTICE "sbull opening!\n");
+  sdev = dev->bd_disk->private_data;
+  printk(KERN_NOTICE "sbull opened!\n");
 
-  spin_lock(&sdev->lock);
+  /*spin_lock(&sdev->lock);
   sdev->users++;
-  spin_unlock(&sdev->lock);
+  spin_unlock(&sdev->lock);*/
 
   return 0;
 }
 
 static void sbull_release(struct gendisk *disk, fmode_t mode){
-  struct sbull_dev *sdev = disk->private_data;
+  struct sbull_dev *sdev;
   printk(KERN_NOTICE "sbull releasing!\n");
+  sdev = disk->private_data;
+  printk(KERN_NOTICE "sbull released!\n");
 
-  spin_lock(&sdev->lock);
+  /*spin_lock(&sdev->lock);
   sdev->users--;
 
-  spin_unlock(&sdev->lock);
+  spin_unlock(&sdev->lock);*/
 }
 
 static int sbull_media_changed(struct gendisk *gd){
@@ -62,7 +66,7 @@ static int sbull_ioctl(struct block_device *dev, fmode_t mode,
                         unsigned cmd, unsigned long arg){
   //struct sbull_dev* sdev = dev->bd_disk->private_data;
   struct hd_geometry disk_geometry;
-
+  printk("ramdrv: ioctl command!\n");
   switch(cmd){
     case HDIO_GETGEO:
     printk("ramdrv: getting geometry info\n");
