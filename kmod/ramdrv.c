@@ -31,18 +31,43 @@ module_param(sector_count, int, 0);
 static int blkdev_id;
 
 static int sbull_open(struct block_device *dev, fmode_t mode){
+  struct sbull_dev *sdev = dev->bd_disk->private_data;
+
+  del_timer_sync(&sdev->timer);
+
+  spin_lock(&sdev->lock);
+
+  sdev->users++;
+  spin_unlock(&sdev->lock);
   return 0;
 }
 
 static void sbull_release(struct gendisk *disk, fmode_t mode){
-  return;
+  struct sbull_dev *sdev = disk->private_data;
+
+  spin_lock(&sdev->lock);
+  sdev->users--;
+
+  if (!sdev->users){
+    sdev->timer.expires = INVALIDATE_DELAY;
+    add_timer(&sdev->timer);
+  }
+
+  spin_unlock(&sdev->lock);
 }
 
 static int sbull_media_changed(struct gendisk *gd){
-  return 0;
+  struct sbull_dev * dev = gd->private_data;
+  return dev->media_change;
 }
 
 static int sbull_revalidate(struct gendisk *gd){
+  struct sbull_dev * dev = gd->private_data;
+
+  if (dev->media_change){
+    dev->media_change = 0;
+    memset(dev->data, 0, dev->size);
+  }
   return 0;
 }
 
@@ -91,23 +116,24 @@ static int __init ramdrv_init(void) {
   ramdrv_sbull_dev->size = sector_count * (logical_block_size / KERNEL_SECTOR_SIZE);
   ramdrv_sbull_dev->data = vmalloc(ramdrv_sbull_dev->size); //allocate virtual disk size
   if (ramdrv_sbull_dev->data == NULL){
-    printk(KERN_WARNING "unable to valloc memory");
+    printk(KERN_WARNING "ramdr: unable to valloc memory\n");
     goto vfree_out;
   }
   spin_lock_init(&(ramdrv_sbull_dev->lock));
 
   ramdrv_sbull_dev->queue = blk_init_queue(sbull_request, &(ramdrv_sbull_dev->lock));
   if (!(ramdrv_sbull_dev->queue)){
-    printk(KERN_WARNING "unable to intialize request queue");
+    printk(KERN_WARNING "ramdrv: unable to intialize request queue\n");
     goto vfree_out;
   }
+  //blk_queue_hardsect_size(ramdrv_sbull_dev->queue, logical_block_size);
 
-  printk("ramdrv: initialized sbull_dev");
+  printk("ramdrv: initialized sbull_dev\n");
 
   //gendisk initialization
   ramdrv_sbull_dev->gd = alloc_disk(1);
   if (!ramdrv_sbull_dev->gd) {
-    printk(KERN_WARNING "alloc_disk failure");
+    printk(KERN_WARNING "alloc_disk failure\n");
     goto vfree_out;
   }
 

@@ -10,6 +10,8 @@
 #define MINOR_SHIFT	4
 #define DEVNUM(kdevnum)	(MINOR(kdev_t_to_nr(kdevnum)) >> MINOR_SHIFT
 
+#define INVALIDATE_DELAY	30*HZ
+
 struct sbull_dev {
         int size;                       /* Device size in sectors */
         u8 *data;                       /* The data array */
