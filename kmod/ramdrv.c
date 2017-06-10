@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/vmalloc.h>
+#include <linux/hdreg.h>
 #include <linux/fs.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
@@ -72,8 +73,22 @@ static int sbull_revalidate(struct gendisk *gd){
 }
 
 static int sbull_ioctl(struct block_device *dev, fmode_t mode,
-  unsigned cmd, unsigned long arg){
-  return 0;
+                        unsigned cmd, unsigned long arg){
+  struct sbull_dev* sdev = dev->bd_disk->private_data;
+  struct hd_geometry disk_geometry;
+
+  switch(cmd){
+    case HDIO_GETGEO:
+    disk_geometry.cylinders = (sdev->size & ~0x3f) >> 6;
+    disk_geometry.heads = 4;
+    disk_geometry.sectors = 16;
+    disk_geometry.start = 4;
+    if (copy_to_user((void __user *) arg, &disk_geometry, sizeof(disk_geometry)))
+            return -EFAULT;
+    break;
+  }
+
+  return -ENOTTY;
 }
 
 // Device request handler
