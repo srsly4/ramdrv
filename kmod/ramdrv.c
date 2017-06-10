@@ -30,6 +30,7 @@ module_param(sector_count, int, 0);
 static int blkdev_id;
 
 static int sbull_open(struct block_device *dev, fmode_t mode){
+  pritnk(KERN_NOTICE "sbull opening!\n");
   struct sbull_dev *sdev = dev->bd_disk->private_data;
 
   del_timer_sync(&sdev->timer);
@@ -38,10 +39,12 @@ static int sbull_open(struct block_device *dev, fmode_t mode){
 
   sdev->users++;
   spin_unlock(&sdev->lock);
+  printk(KERN_NOTICE "sbull opened!\n");
   return 0;
 }
 
 static void sbull_release(struct gendisk *disk, fmode_t mode){
+  printk(KERN_NOTICE "sbull releasing!\n");
   struct sbull_dev *sdev = disk->private_data;
 
   spin_lock(&sdev->lock);
@@ -53,11 +56,11 @@ static void sbull_release(struct gendisk *disk, fmode_t mode){
   }
 
   spin_unlock(&sdev->lock);
+  printk(KERN_NOTICE "sbull released!\n");
 }
 
 static int sbull_media_changed(struct gendisk *gd){
-  struct sbull_dev * dev = gd->private_data;
-  return dev->media_change;
+  return 0;
 }
 
 static int sbull_revalidate(struct gendisk *gd){
@@ -155,11 +158,14 @@ static int __init ramdrv_init(void) {
     goto out;
   }
 
-  printk("ramdrv: initialized block device\n");
+  printk(KERN_NOTICE "ramdrv: initialized block device\n");
 
   //fill the sbull_dev struct
   ramdrv_sbull_dev = kmalloc(sizeof(struct sbull_dev), GFP_KERNEL);
   memset(ramdrv_sbull_dev, 0, sizeof(struct sbull_dev));
+
+  ramdrv_sbull_dev->media_changed = 0;
+  ramdrv_sbull_dev->users = 0;
   ramdrv_sbull_dev->size = sector_count * KERNEL_SECTOR_SIZE;
   ramdrv_sbull_dev->data = vmalloc(ramdrv_sbull_dev->size); //allocate virtual disk size
   if (ramdrv_sbull_dev->data == NULL){
@@ -175,7 +181,7 @@ static int __init ramdrv_init(void) {
   }
   //blk_queue_hardsect_size(ramdrv_sbull_dev->queue, logical_block_size);
 
-  printk("ramdrv: initialized sbull_dev\n");
+  printk(KERN_NOTICE "ramdrv: initialized sbull_dev\n");
 
   //gendisk initialization
   ramdrv_sbull_dev->gd = alloc_disk(1);
@@ -194,7 +200,7 @@ static int __init ramdrv_init(void) {
   add_disk(ramdrv_sbull_dev->gd);
 
   //finished
-  printk("ramdrv module installed\n");
+  printk(KERN_NOTICE "ramdrv module installed\n");
   goto out;
 
   vfree_out:
@@ -215,14 +221,14 @@ static void __exit ramdrv_exit(void) {
   }
   if (ramdrv_sbull_dev->data){
     vfree(ramdrv_sbull_dev->data);
-    printk("ramdrv data destroyed\n");
+    printk(KERN_NOTICE "ramdrv data destroyed\n");
   }
 
   kfree(ramdrv_sbull_dev);
 
   unregister_blkdev(blkdev_id, RAMDRV_BLKDEV_NAME);
 
-  printk("ramdrv module uninstalled\n");
+  printk(KERN_NOTICE "ramdrv module uninstalled\n");
 }
 
 module_init(ramdrv_init);
