@@ -1,0 +1,14 @@
+.idea
+build
+cmake-build-debug
+kmod/.tmp_versions
+*.o
+*.ko
+*.cmd
+lib/CMakeFiles
+userprog/CMakeFiles
+CMakeCache.txt
+CMakeFiles
+*.symvers
+*.orders
+*.mod.c
