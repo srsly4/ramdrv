@@ -114,7 +114,11 @@ static void sbull_request(struct request_queue *queue){
   //get anything from the queue
   while ((req = blk_fetch_request(queue)) != NULL){
     struct sbull_dev *dev = req->rq_disk->private_data;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
     if (req == NULL || (!(req->cmd_flags & REQ_OP_WRITE) && !(req->cmd_flags & REQ_OP_READ))) { //if it's not from-disk or to-disk request
+#else
+    if (req == NULL || req->cmd_type != REQ_TYPE_FS) {
+#endif
       printk(KERN_NOTICE "Skipped non-fs request \n");
       __blk_end_request_all(req, -EIO);
       continue;
