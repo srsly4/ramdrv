@@ -22,10 +22,7 @@
 
 
 /* Module params */
-static int logical_block_size = 512;
-module_param(logical_block_size, int, 0);
-
-static int sector_count = 1024;
+static int sector_count = 262144; // 128MB
 module_param(sector_count, int, 0);
 
 
@@ -51,7 +48,7 @@ static void sbull_release(struct gendisk *disk, fmode_t mode){
   sdev->users--;
 
   if (!sdev->users){
-    sdev->timer.expires = INVALIDATE_DELAY;
+    sdev->timer.expires = jiffies + INVALIDATE_DELAY;
     add_timer(&sdev->timer);
   }
 
@@ -67,6 +64,7 @@ static int sbull_revalidate(struct gendisk *gd){
   struct sbull_dev * dev = gd->private_data;
 
   if (dev->media_change){
+    printk("ramdrv: revalidated!\n");
     dev->media_change = 0;
     memset(dev->data, 0, dev->size);
   }
@@ -80,6 +78,7 @@ static int sbull_ioctl(struct block_device *dev, fmode_t mode,
 
   switch(cmd){
     case HDIO_GETGEO:
+    printk("ramdrv: getting geometry info\n");
     disk_geometry.cylinders = (sdev->size & ~0x3f) >> 6;
     disk_geometry.heads = 4;
     disk_geometry.sectors = 16;
@@ -148,7 +147,6 @@ static struct sbull_dev *ramdrv_sbull_dev;
 /* Driver init callback */
 static int __init ramdrv_init(void) {
   int ret = 0;
-  int which = 0;
 
   // register block device
   blkdev_id = register_blkdev(0, RAMDRV_BLKDEV_NAME);
@@ -162,7 +160,7 @@ static int __init ramdrv_init(void) {
   //fill the sbull_dev struct
   ramdrv_sbull_dev = kmalloc(sizeof(struct sbull_dev), GFP_KERNEL);
   memset(ramdrv_sbull_dev, 0, sizeof(struct sbull_dev));
-  ramdrv_sbull_dev->size = sector_count * (logical_block_size / KERNEL_SECTOR_SIZE);
+  ramdrv_sbull_dev->size = sector_count * KERNEL_SECTOR_SIZE;
   ramdrv_sbull_dev->data = vmalloc(ramdrv_sbull_dev->size); //allocate virtual disk size
   if (ramdrv_sbull_dev->data == NULL){
     printk(KERN_WARNING "ramdr: unable to valloc memory\n");
@@ -192,7 +190,7 @@ static int __init ramdrv_init(void) {
   ramdrv_sbull_dev->gd->queue = ramdrv_sbull_dev->queue;
   ramdrv_sbull_dev->gd->private_data = (void*)ramdrv_sbull_dev;
   snprintf(ramdrv_sbull_dev->gd->disk_name, 32, "ramdrv");
-  set_capacity(ramdrv_sbull_dev->gd, sector_count * (logical_block_size / KERNEL_SECTOR_SIZE));
+  set_capacity(ramdrv_sbull_dev->gd, sector_count);
   add_disk(ramdrv_sbull_dev->gd);
 
   //finished
@@ -215,8 +213,10 @@ static void __exit ramdrv_exit(void) {
   if (ramdrv_sbull_dev->queue) {
     blk_put_queue(ramdrv_sbull_dev->queue);
   }
-  if (ramdrv_sbull_dev->data)
+  if (ramdrv_sbull_dev->data){
     vfree(ramdrv_sbull_dev->data);
+    printk("ramdrv data destroyed\n");
+  }
 
   kfree(ramdrv_sbull_dev);
 
