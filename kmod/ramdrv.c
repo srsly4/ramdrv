@@ -6,7 +6,6 @@
 #include <asm/uaccess.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/timer.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/vmalloc.h>
@@ -33,12 +32,10 @@ static int sbull_open(struct block_device *dev, fmode_t mode){
   struct sbull_dev *sdev = dev->bd_disk->private_data;
   printk(KERN_NOTICE "sbull opening!\n");
 
-  del_timer_sync(&sdev->timer);
-
   spin_lock(&sdev->lock);
-
   sdev->users++;
   spin_unlock(&sdev->lock);
+
   printk(KERN_NOTICE "sbull opened!\n");
   return 0;
 }
@@ -50,11 +47,6 @@ static void sbull_release(struct gendisk *disk, fmode_t mode){
   spin_lock(&sdev->lock);
   sdev->users--;
 
-  if (!sdev->users){
-    sdev->timer.expires = jiffies + INVALIDATE_DELAY;
-    add_timer(&sdev->timer);
-  }
-
   spin_unlock(&sdev->lock);
   printk(KERN_NOTICE "sbull released!\n");
 }
@@ -64,40 +56,22 @@ static int sbull_media_changed(struct gendisk *gd){
 }
 
 static int sbull_revalidate(struct gendisk *gd){
-  struct sbull_dev * dev = gd->private_data;
-
-  if (dev->media_change){
-    printk("ramdrv: revalidated!\n");
-    dev->media_change = 0;
-    memset(dev->data, 0, dev->size);
-  }
   return 0;
 }
 
-void sbull_invalidate(unsigned long ldev)
-{
-	struct sbull_dev *dev = (struct sbull_dev *) ldev;
-
-	spin_lock(&dev->lock);
-	if (dev->users || !dev->data)
-		printk (KERN_WARNING "sbull: timer sanity check failed\n");
-	else
-		dev->media_change = 1;
-	spin_unlock(&dev->lock);
-}
 
 static int sbull_ioctl(struct block_device *dev, fmode_t mode,
                         unsigned cmd, unsigned long arg){
-  struct sbull_dev* sdev = dev->bd_disk->private_data;
+  //struct sbull_dev* sdev = dev->bd_disk->private_data;
   struct hd_geometry disk_geometry;
 
   switch(cmd){
     case HDIO_GETGEO:
     printk("ramdrv: getting geometry info\n");
-    disk_geometry.cylinders = (sdev->size & ~0x3f) >> 6;
+    disk_geometry.cylinders = 512;
     disk_geometry.heads = 4;
     disk_geometry.sectors = 16;
-    disk_geometry.start = 4;
+    disk_geometry.start = 0;
     if (copy_to_user((void __user *) arg, &disk_geometry, sizeof(disk_geometry)))
             return -EFAULT;
     break;
@@ -192,11 +166,7 @@ static int __init ramdrv_init(void) {
 
   spin_lock_init(&(ramdrv_sbull_dev->lock));
 
-  init_timer(&ramdrv_sbull_dev->timer);
-	ramdrv_sbull_dev->timer.data = (unsigned long) ramdrv_sbull_dev;
-	ramdrv_sbull_dev->timer.function = sbull_invalidate;
-
-  printk(KERN_NOTICE "ramdrv: timered!\n");
+  printk(KERN_NOTICE "ramdrv: spinlocked!\n");
 
   ramdrv_sbull_dev->queue = blk_init_queue(sbull_request, &(ramdrv_sbull_dev->lock));
   if (!(ramdrv_sbull_dev->queue)){
