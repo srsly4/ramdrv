@@ -74,6 +74,18 @@ static int sbull_revalidate(struct gendisk *gd){
   return 0;
 }
 
+void sbull_invalidate(unsigned long ldev)
+{
+	struct sbull_dev *dev = (struct sbull_dev *) ldev;
+
+	spin_lock(&dev->lock);
+	if (dev->users || !dev->data)
+		printk (KERN_WARNING "sbull: timer sanity check failed\n");
+	else
+		dev->media_change = 1;
+	spin_unlock(&dev->lock);
+}
+
 static int sbull_ioctl(struct block_device *dev, fmode_t mode,
                         unsigned cmd, unsigned long arg){
   struct sbull_dev* sdev = dev->bd_disk->private_data;
@@ -157,8 +169,8 @@ static int __init ramdrv_init(void) {
     printk(KERN_WARNING "ramdrv: unable to register block device.\n");
     goto out;
   }
-
   printk(KERN_NOTICE "ramdrv: initialized block device\n");
+
 
   //fill the sbull_dev struct
   ramdrv_sbull_dev = kmalloc(sizeof(struct sbull_dev), GFP_KERNEL);
@@ -174,12 +186,18 @@ static int __init ramdrv_init(void) {
   }
   spin_lock_init(&(ramdrv_sbull_dev->lock));
 
+  init_timer(&ramdrv_sbull_dev->timer);
+	ramdrv_sbull_dev->timer.data = (unsigned long) ramdrv_sbull_dev;
+	ramdrv_sbull_dev->timer.function = sbull_invalidate;
+
   ramdrv_sbull_dev->queue = blk_init_queue(sbull_request, &(ramdrv_sbull_dev->lock));
   if (!(ramdrv_sbull_dev->queue)){
     printk(KERN_WARNING "ramdrv: unable to intialize request queue\n");
     goto vfree_out;
   }
   //blk_queue_hardsect_size(ramdrv_sbull_dev->queue, logical_block_size);
+  blk_queue_logical_block_size(ramdrv_sbull_dev->queue, KERNEL_SECTOR_SIZE);
+	ramdrv_sbull_dev->queue->queuedata = ramdrv_sbull_dev;
 
   printk(KERN_NOTICE "ramdrv: initialized sbull_dev\n");
 
@@ -200,7 +218,7 @@ static int __init ramdrv_init(void) {
   add_disk(ramdrv_sbull_dev->gd);
 
   //finished
-  printk(KERN_NOTICE "ramdrv module installed\n");
+  printk(KERN_NOTICE "ramdrv: module installed\n");
   goto out;
 
   vfree_out:
@@ -217,16 +235,15 @@ static void __exit ramdrv_exit(void) {
     put_disk(ramdrv_sbull_dev->gd);
   }
   if (ramdrv_sbull_dev->queue) {
-    blk_put_queue(ramdrv_sbull_dev->queue);
+    blk_cleanup_queue(ramdrv_sbull_dev->queue);
   }
   if (ramdrv_sbull_dev->data){
     vfree(ramdrv_sbull_dev->data);
     printk(KERN_NOTICE "ramdrv data destroyed\n");
   }
 
-  kfree(ramdrv_sbull_dev);
-
   unregister_blkdev(blkdev_id, RAMDRV_BLKDEV_NAME);
+  kfree(ramdrv_sbull_dev);
 
   printk(KERN_NOTICE "ramdrv module uninstalled\n");
 }
