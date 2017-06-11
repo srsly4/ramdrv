@@ -27,7 +27,6 @@ module_param(sector_count, int, 0);
 
 /* ramdrv device definition */
 static struct ramdrv_dev **devices;
-static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors, int device_ndx);
 
 // control device id
 static int cntldev_id;
@@ -70,58 +69,6 @@ ssize_t cntl_read(struct file *f, char* user_buffer, size_t count, loff_t *posit
     *position += count;
     return count;
 }
-
-static long cntl_ioctl(struct file *file,
-                        unsigned cmd, unsigned long arg){
-  long res = 0, err = 0;
-  int dev_ndx;
-  ramdrv_ioctl_param_union param;
-  if (_IOC_TYPE(cmd) != RAMDRV_MAGIC) return -ENOTTY;
-	if (_IOC_NR(cmd) > RAMDRV_IOC_MAX) return -ENOTTY;
-
-  if (_IOC_DIR(cmd) & _IOC_READ)
-  		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
-  	else if (_IOC_DIR(cmd) & _IOC_WRITE)
-  		err =  !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
-  	if (err) return -EFAULT;
-
-  switch(cmd){
-    case RAMDRV_IOCTL_CREATE: //create ramdrive
-      res = copy_from_user(&param, (void*)arg, sizeof(ramdrv_ioctl_create_t));
-      if (res < 0){
-        printk(KERN_WARNING "ramdrv: ivalid create ioctl command\n");
-        return -ENOTTY;
-      }
-      dev_ndx = find_free_device_index();
-      if (dev_ndx >= RAMDRV_MINORS)
-        return -ENOTTY;
-
-      param.create.index = dev_ndx;
-      devices[dev_ndx] = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
-      res = ramdrv_device_init(devices[dev_ndx], param.create.sectors, dev_ndx);
-      if (res < 0){
-        printk(KERN_WARNING "ramdrv: could not have create ramdrv\n");
-        param.create.index = -1;
-      }
-      else
-        printk(KERN_INFO "ramdrv: created %d sectors on dev ramdrv%d!\n",
-          param.create.sectors, dev_ndx);
-      copy_to_user((void*)arg, &param, sizeof(ramdrv_ioctl_create_t));
-    break;
-
-    default:
-      return -ENOTTY;
-  }
-
-  return res;
-}
-
-struct file_operations cntl_file_operations = {
-  .owner = THIS_MODULE,
-  .read = cntl_read,
-  .unlocked_ioctl = cntl_ioctl
-};
-
 
 
 // block device major number
@@ -315,6 +262,59 @@ static void ramdrv_device_destroy(int ndx){
   kfree(devices[ndx]);
   devices[ndx] = NULL;
 }
+
+
+
+static long cntl_ioctl(struct file *file,
+                        unsigned cmd, unsigned long arg){
+  long res = 0, err = 0;
+  int dev_ndx;
+  ramdrv_ioctl_param_union param;
+  if (_IOC_TYPE(cmd) != RAMDRV_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > RAMDRV_IOC_MAX) return -ENOTTY;
+
+  if (_IOC_DIR(cmd) & _IOC_READ)
+  		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+  	else if (_IOC_DIR(cmd) & _IOC_WRITE)
+  		err =  !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+  	if (err) return -EFAULT;
+
+  switch(cmd){
+    case RAMDRV_IOCTL_CREATE: //create ramdrive
+      res = copy_from_user(&param, (void*)arg, sizeof(ramdrv_ioctl_create_t));
+      if (res < 0){
+        printk(KERN_WARNING "ramdrv: ivalid create ioctl command\n");
+        return -ENOTTY;
+      }
+      dev_ndx = find_free_device_index();
+      if (dev_ndx >= RAMDRV_MINORS)
+        return -ENOTTY;
+
+      param.create.index = dev_ndx;
+      devices[dev_ndx] = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
+      res = ramdrv_device_init(devices[dev_ndx], param.create.sectors, dev_ndx);
+      if (res < 0){
+        printk(KERN_WARNING "ramdrv: could not have create ramdrv\n");
+        param.create.index = -1;
+      }
+      else
+        printk(KERN_INFO "ramdrv: created %d sectors on dev ramdrv%d!\n",
+          param.create.sectors, dev_ndx);
+      copy_to_user((void*)arg, &param, sizeof(ramdrv_ioctl_create_t));
+    break;
+
+    default:
+      return -ENOTTY;
+  }
+
+  return res;
+}
+
+struct file_operations cntl_file_operations = {
+  .owner = THIS_MODULE,
+  .read = cntl_read,
+  .unlocked_ioctl = cntl_ioctl
+};
 
 /* Module initialization */
 static int __init ramdrv_init(void) {
