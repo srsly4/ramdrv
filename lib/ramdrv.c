@@ -35,5 +35,7 @@ int ramdrv_create(int fd, int sectors){
   memset(&args, 0, sizeof(args));
   args.sectors = sectors;
   ret = ioctl(fd, RAMDRV_IOCTL_CREATE, &args);
+  if (ret >= 0)
+    return args.index;
   return ret;
 }

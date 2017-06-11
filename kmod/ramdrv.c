@@ -27,6 +27,7 @@ module_param(sector_count, int, 0);
 
 /* ramdrv device definition */
 static struct ramdrv_dev **devices;
+static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors, int device_ndx);
 
 // control device id
 static int cntldev_id;
@@ -92,8 +93,20 @@ static long cntl_ioctl(struct file *file,
         return -ENOTTY;
       }
       dev_ndx = find_free_device_index();
-      printk(KERN_INFO "ramdrv: created %d sectors on dev ramdrv%d!\n",
-        param.create.sectors, dev_ndx);
+      if (dev_ndx >= RAMDRV_MINORS)
+        return -ENOTTY;
+
+      param.create.index = dev_ndx;
+      devices[dev_ndx] = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
+      res = ramdrv_device_init(devices[dev_ndx], param.create.sectors, dev_ndx);
+      if (res < 0){
+        printk(KERN_WARNING "ramdrv: could not have create ramdrv\n");
+        param.create.index = -1;
+      }
+      else
+        printk(KERN_INFO "ramdrv: created %d sectors on dev ramdrv%d!\n",
+          param.create.sectors, dev_ndx);
+      copy_to_user((void*)arg, &param, sizeof(ramdrv_ioctl_create_t));
     break;
 
     default:
