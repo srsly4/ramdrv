@@ -33,6 +33,12 @@ static int cntldev_id;
 static char* cntldev_buff;
 static size_t cntldev_buffsize;
 
+static int find_free_device_index(void){
+  int i = 0;
+  while (devices[i] != NULL && i < RAMDRV_MINORS) i++;
+  return i;
+}
+
 void cntl_refresh_buff(void){
   int i = 0, devs = 0;
   if (cntldev_buff == NULL){
@@ -67,7 +73,8 @@ ssize_t cntl_read(struct file *f, char* user_buffer, size_t count, loff_t *posit
 static long cntl_ioctl(struct file *file,
                         unsigned cmd, unsigned long arg){
   long res = 0, err = 0;
-  printk(KERN_INFO "ramdrv: ioctl catched!\n");
+  int dev_ndx;
+  ramdrv_ioctl_param_union param;
   if (_IOC_TYPE(cmd) != RAMDRV_MAGIC) return -ENOTTY;
 	if (_IOC_NR(cmd) > RAMDRV_IOC_MAX) return -ENOTTY;
 
@@ -79,7 +86,14 @@ static long cntl_ioctl(struct file *file,
 
   switch(cmd){
     case RAMDRV_IOCTL_CREATE: //create ramdrive
-      printk(KERN_INFO "ramdrv: yeah!\n");
+      res = copy_from_user(&param, (void*)arg, sizeof(ramdrv_ioctl_create_t));
+      if (res < 0){
+        printk(KERN_WARNING "ramdrv: ivalid create ioctl command\n");
+        return -ENOTTY;
+      }
+      dev_ndx = find_free_device_index();
+      printk(KERN_INFO "ramdrv: created %d sectors on dev ramdrv%d!\n",
+        param.create.sectors, dev_ndx);
     break;
 
     default:

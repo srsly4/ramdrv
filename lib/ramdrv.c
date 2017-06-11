@@ -9,13 +9,11 @@
 #include <sys/types.h>
 #include <linux/unistd.h>
 
-
 #include <linux/ramdrv.h>
 #include <ramdrv.h>
 
 
 int ramdrv_open(void) {
-
     int fd = open("/dev/ramdrv", 'w');
 
     if (fd < 0)
@@ -31,11 +29,11 @@ int ramdrv_close(int fd) {
     return ret;
 }
 
-int ramdrv_create(int fd){
+int ramdrv_create(int fd, int sectors){
   int ret = 0;
   ramdrv_ioctl_create_t args;
   memset(&args, 0, sizeof(args));
-  args.sectors = 1000;
+  args.sectors = sectors;
   ret = ioctl(fd, RAMDRV_IOCTL_CREATE, &args);
   return ret;
 }

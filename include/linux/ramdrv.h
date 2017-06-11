@@ -10,12 +10,10 @@
  * There typically needs to be a struct definition for each flavor of
  * IOCTL call.
  */
-typedef struct ramdrv_ioctl_inc_s {
-    int placeholder;
-} ramdrv_ioctl_inc_t;
 
 typedef struct ramdrv_ioctl_create_s {
   int sectors;
+  int index;
 } ramdrv_ioctl_create_t;
 
 /*
@@ -24,7 +22,6 @@ typedef struct ramdrv_ioctl_create_s {
  * union.
  */
 typedef union ramdrv_ioctl_param_u {
-    ramdrv_ioctl_inc_t set;
     ramdrv_ioctl_create_t create;
 } ramdrv_ioctl_param_union;
 
@@ -43,8 +40,7 @@ typedef union ramdrv_ioctl_param_u {
  * shifting and OR-ing of each of these arguments to create the
  * (hopefully) unique constants used for IOCTL command values.
  */
-#define RAMDRV_IOCTL_INCREMENT	   _IOW(RAMDRV_MAGIC, 1, ramdrv_ioctl_inc_t)
-#define RAMDRV_IOCTL_CREATE _IOW(RAMDRV_MAGIC, 2, ramdrv_ioctl_create_t)
+#define RAMDRV_IOCTL_CREATE _IOWR(RAMDRV_MAGIC, 2, ramdrv_ioctl_create_t)
 
 #define RAMDRV_IOC_MAX 2
 #endif /* RAMDRV_H */
