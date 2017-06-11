@@ -67,6 +67,7 @@ ssize_t cntl_read(struct file *f, char* user_buffer, size_t count, loff_t *posit
 static long cntl_ioctl(struct file *file,
                         unsigned cmd, unsigned long arg){
   long res = 0, err = 0;
+  printk(KERN_INFO "ramdrv: ioctl catched!\n");
   if (_IOC_TYPE(cmd) != RAMDRV_MAGIC) return -ENOTTY;
 	if (_IOC_NR(cmd) > RAMDRV_IOC_MAX) return -ENOTTY;
 
