@@ -218,7 +218,7 @@ static int __init ramdrv_init(void) {
 
   //fill the ramdrv_dev struct
   ramdrv_ramdrv_dev = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
-  ramdrv_device_init(ramdrv_ramdrv_dev, 0);
+  ramdrv_device_init(ramdrv_ramdrv_dev, sector_count);
 
   //finished
   printk(KERN_INFO "ramdrv: module installed\n");
