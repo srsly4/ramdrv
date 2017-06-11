@@ -247,7 +247,12 @@ vfree_out:
 
 }
 
-static void ramdrv_device_destroy(int ndx){
+static int ramdrv_device_destroy(int ndx){
+  if (devices[ndx] == NULL)
+    return -EINVAL;
+  if (devices[ndx]->users > 0){
+    return -EBUSY;
+  }
   printk(KERN_NOTICE "ramdrv: device %s has been destroyed\n", devices[ndx]->gd->disk_name);
   if (devices[ndx]->gd){
     del_gendisk(devices[ndx]->gd);
@@ -261,6 +266,7 @@ static void ramdrv_device_destroy(int ndx){
   }
   kfree(devices[ndx]);
   devices[ndx] = NULL;
+  return 0;
 }
 
 
@@ -301,6 +307,23 @@ static long cntl_ioctl(struct file *file,
         printk(KERN_INFO "ramdrv: created %d sectors on dev ramdrv%d!\n",
           param.create.sectors, dev_ndx);
       copy_to_user((void*)arg, &param, sizeof(ramdrv_ioctl_create_t));
+    break;
+
+    case RAMDRV_IOCTL_DELETE:
+      res = copy_from_user(&param, (void*)arg, sizeof(ramdrv_ioctl_create_t));
+      if (res < 0){
+        printk(KERN_WARNING "ramdrv: ivalid create ioctl command\n");
+        return -ENOTTY;
+      }
+      dev_ndx = param.delete.index;
+      res = ramdrv_device_destroy(dev_ndx);
+      if (res < 0){
+        if (res == -EBUSY)
+          printk(KERN_WARNING "ramdrv: device ramdrv%c is busy\n", dev_ndx+'0');
+        printk(KERN_WARNING "ramdrv: could not have delete drive\n");
+      }
+      else
+        res = 0;
     break;
 
     default:

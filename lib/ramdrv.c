@@ -39,3 +39,11 @@ int ramdrv_create(int fd, int sectors){
     return args.index;
   return ret;
 }
+int ramdrv_delete(int fd, int dev_num){
+  int ret = 0;
+  ramdrv_ioctl_delete_t args;
+  memset(&args, 0, sizeof(args));
+  args.index = dev_num;
+  ret = ioctl(fd, RAMDRV_IOCTL_CREATE, &args);
+  return ret;
+}

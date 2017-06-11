@@ -16,6 +16,9 @@ typedef struct ramdrv_ioctl_create_s {
   int index;
 } ramdrv_ioctl_create_t;
 
+typedef struct ramdrv_ioctl_delete_s {
+  int index;
+} ramdrv_ioctl_delete_t;
 /*
  * This generic union allows us to make a more generic IOCTRL call
  * interface. Each per-IOCTL-flavor struct should be a member of this
@@ -23,6 +26,7 @@ typedef struct ramdrv_ioctl_create_s {
  */
 typedef union ramdrv_ioctl_param_u {
     ramdrv_ioctl_create_t create;
+    ramdrv_ioctl_delete_t delete;
 } ramdrv_ioctl_param_union;
 
 
@@ -40,6 +44,7 @@ typedef union ramdrv_ioctl_param_u {
  * shifting and OR-ing of each of these arguments to create the
  * (hopefully) unique constants used for IOCTL command values.
  */
+#define RAMDRV_IOCTL_DELETE _IOW(RAMDRV_MAGIC, 1, ramdrv_ioctl_delete_t)
 #define RAMDRV_IOCTL_CREATE _IOWR(RAMDRV_MAGIC, 2, ramdrv_ioctl_create_t)
 
 #define RAMDRV_IOC_MAX 2
