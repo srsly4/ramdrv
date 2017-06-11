@@ -51,7 +51,7 @@ void cntl_refresh_buff(void){
     }
   }
 
-  snprintf(cntldev_buff, 128, "ramdrv current devices: %d\n", devs);
+  snprintf(cntldev_buff, 128, "ramdrv current devices: %d\n\n", devs);
   cntldev_buffsize = strlen(cntldev_buff+1);
 }
 
@@ -238,6 +238,7 @@ static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors, int device_nd
   add_disk(dev->gd);
   printk(KERN_INFO "ramdrv: created device %s\n", dev->gd->disk_name);
 
+  cntl_refresh_buff();
   return 0; //success
 
   //failure
@@ -266,6 +267,7 @@ static int ramdrv_device_destroy(int ndx){
   }
   kfree(devices[ndx]);
   devices[ndx] = NULL;
+  cntl_refresh_buff();
   return 0;
 }
 
@@ -365,9 +367,6 @@ static int __init ramdrv_init(void) {
   //allocate table of devices with nulls
   devices = kmalloc(RAMDRV_MINORS * sizeof(struct ramdrv_dev*), GFP_KERNEL);
   memset(devices, 0, RAMDRV_MINORS * sizeof(struct ramdrv_dev*));
-
-  devices[0] = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
-  ramdrv_device_init(devices[0], sector_count, 0);
 
   cntl_refresh_buff();
   //finished
