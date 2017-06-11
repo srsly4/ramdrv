@@ -44,6 +44,6 @@ int ramdrv_delete(int fd, int dev_num){
   ramdrv_ioctl_delete_t args;
   memset(&args, 0, sizeof(args));
   args.index = dev_num;
-  ret = ioctl(fd, RAMDRV_IOCTL_CREATE, &args);
+  ret = ioctl(fd, RAMDRV_IOCTL_DELETE, &args);
   return ret;
 }
