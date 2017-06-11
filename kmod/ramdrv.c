@@ -306,7 +306,8 @@ static long cntl_ioctl(struct file *file,
       else
         printk(KERN_INFO "ramdrv: created %d sectors on dev ramdrv%d!\n",
           param.create.sectors, dev_ndx);
-      copy_to_user((void*)arg, &param, sizeof(ramdrv_ioctl_create_t));
+      res = copy_to_user((void*)arg, &param, sizeof(ramdrv_ioctl_create_t));
+      res = 0;
     break;
 
     case RAMDRV_IOCTL_DELETE:

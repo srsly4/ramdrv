@@ -48,7 +48,7 @@ int main(int argc, char** argv){
       fprintf(stderr, "Sector count too low (>1024=512KB)\n");
       exit(EXIT_FAILURE);
     }
-    res = ramdrv_create(fd, 131072);
+    res = ramdrv_create(fd, num);
     if (res >= 0){
       printf("created device: ramdrv%c\n", '0' + res);
       exit(EXIT_SUCCESS);
