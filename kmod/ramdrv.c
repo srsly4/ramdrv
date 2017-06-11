@@ -206,6 +206,22 @@ vfree_out:
 
 }
 
+static void ramdrv_device_destroy(int ndx){
+  printk(KERN_NOTICE "device %s has been destroyed\n", devices[ndx]->gd->disk_name);
+  if (devices[ndx]->gd){
+    del_gendisk(devices[ndx]->gd);
+    put_disk(devices[ndx]->gd);
+  }
+  if (devices[ndx]->queue) {
+    blk_cleanup_queue(devices[ndx]->queue);
+  }
+  if (devices[ndx]->data){
+    vfree(devices[ndx]->data);
+  }
+  kfree(devices[ndx]);
+  devices[ndx] = NULL;
+}
+
 /* Module initialization */
 static int __init ramdrv_init(void) {
   int ret = 0;
@@ -238,19 +254,8 @@ static void __exit ramdrv_exit(void) {
   int ndx = 0;
   //dealloc each device
   for (ndx = 0; ndx < RAMDRV_MINORS; ndx++){
-    if (devices[0] == NULL) continue;
-    printk(KERN_NOTICE "device %s has been destroyed\n", devices[0]->gd->disk_name);
-    if (devices[0]->gd){
-      del_gendisk(devices[0]->gd);
-      put_disk(devices[0]->gd);
-    }
-    if (devices[0]->queue) {
-      blk_cleanup_queue(devices[0]->queue);
-    }
-    if (devices[0]->data){
-      vfree(devices[0]->data);
-    }
-    kfree(devices[0]);
+    if (devices[ndx] == NULL) continue;
+    ramdrv_device_destroy(ndx);
   }
 
   unregister_blkdev(blkdev_id, RAMDRV_BLKDEV_NAME);
