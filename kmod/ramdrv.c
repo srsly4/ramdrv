@@ -154,81 +154,74 @@ static struct block_device_operations ramdrv_blkops = {
 
 /* ramdrv device definition */
 static struct ramdrv_dev *ramdrv_ramdrv_dev;
+static int ramdrv_next_index;
+
+static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors){
+  //fill data with zeros
+  memset(dev, 0, sizeof(struct ramdrv_dev));
+
+  //calculate the real size and alloc the data in memory
+  dev->size = sectors * KERNEL_SECTOR_SIZE;
+  if ((dev->data = vmalloc(dev->size)) == NULL){
+    printk(KERN_ERR "ramdrv: could not allocate memory\n");
+    return -1;
+  }
+
+  spin_lock_init(&dev->lock); //create spinlock...
+  dev->queue = blk_alloc_queue(GFP_KERNEL); //...and request queue
+
+  //handle making request, set queue block size
+  blk_queue_make_request(dev->queue, ramdrv_make_request);
+  blk_queue_logical_block_size(dev->queue, KERNEL_SECTOR_SIZE);
+  dev->queue->queuedata = dev;
+
+  //gendisk initialization
+  dev->gd = alloc_disk(1);
+  if (!dev->gd) {
+    printk(KERN_ERR "ramdrv: alloc_disk failure\n");
+    goto vfree_out;
+  }
+
+  dev->gd->major = blkdev_id;
+  dev->gd->first_minor = ramdrv_next_index*RAMDRV_MINORS;
+  dev->gd->fops = &ramdrv_blkops;
+  dev->gd->queue = dev->queue;
+  dev->gd->private_data = (void*)dev;
+  snprintf(dev->gd->disk_name, 32, "ramdrv%c", ramdrv_next_index+'0');
+
+  set_capacity(dev->gd, sectors);
+  add_disk(dev->gd);
+  printk(KERN_INFO "ramdrv: created device %s\n", dev->gd->disk_name);
+
+  return 0; //success
+
+  //failure
+vfree_out:
+  vfree(dev->data);
+  return -1;
+
+}
 
 /* Module initialization */
 static int __init ramdrv_init(void) {
   int ret = 0;
+  ramdrv_next_index = 0;
 
   // register block device
   blkdev_id = register_blkdev(0, RAMDRV_BLKDEV_NAME);
   if (blkdev_id < 0){
-    printk(KERN_WARNING "ramdrv: unable to register block device.\n");
+    printk(KERN_ERR "ramdrv: unable to register block device.\n");
     goto out;
   }
-  printk(KERN_NOTICE "ramdrv: initialized block device\n");
+  printk(KERN_INFO "ramdrv: initialized block device\n");
 
 
   //fill the ramdrv_dev struct
   ramdrv_ramdrv_dev = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
-  memset(ramdrv_ramdrv_dev, 0, sizeof(struct ramdrv_dev));
-
-
-  printk(KERN_NOTICE "ramdrv: initialized ramdrv struct\n");
-
-  ramdrv_ramdrv_dev->media_change = 0;
-  ramdrv_ramdrv_dev->users = 0;
-  ramdrv_ramdrv_dev->size = sector_count * KERNEL_SECTOR_SIZE;
-  ramdrv_ramdrv_dev->data = vmalloc(ramdrv_ramdrv_dev->size); //allocate virtual disk size
-
-  if (ramdrv_ramdrv_dev->data == NULL){
-    printk(KERN_WARNING "ramdr: unable to valloc memory\n");
-    goto vfree_out;
-  }
-  printk(KERN_NOTICE "ramdrv: valloced!\n");
-
-  spin_lock_init(&(ramdrv_ramdrv_dev->lock));
-
-  printk(KERN_NOTICE "ramdrv: spinlocked!\n");
-
-  ramdrv_ramdrv_dev->queue = blk_alloc_queue(GFP_KERNEL);
-	if (ramdrv_ramdrv_dev->queue == NULL)
-		goto vfree_out;
-	blk_queue_make_request(ramdrv_ramdrv_dev->queue, ramdrv_make_request);
-
-  /*ramdrv_ramdrv_dev->queue = blk_init_queue(ramdrv_request, &(ramdrv_ramdrv_dev->lock));
-  if (!(ramdrv_ramdrv_dev->queue)){
-    printk(KERN_WARNING "ramdrv: unable to intialize request queue\n");
-    goto vfree_out;
-  }*/
-  //blk_queue_hardsect_size(ramdrv_ramdrv_dev->queue, logical_block_size);
-  blk_queue_logical_block_size(ramdrv_ramdrv_dev->queue, KERNEL_SECTOR_SIZE);
-	ramdrv_ramdrv_dev->queue->queuedata = ramdrv_ramdrv_dev;
-
-  printk(KERN_NOTICE "ramdrv: initialized ramdrv_dev\n");
-
-  //gendisk initialization
-  ramdrv_ramdrv_dev->gd = alloc_disk(1);
-  if (!ramdrv_ramdrv_dev->gd) {
-    printk(KERN_WARNING "alloc_disk failure\n");
-    goto vfree_out;
-  }
-
-  ramdrv_ramdrv_dev->gd->major = blkdev_id;
-  ramdrv_ramdrv_dev->gd->first_minor = 0;
-  ramdrv_ramdrv_dev->gd->fops = &ramdrv_blkops;
-  ramdrv_ramdrv_dev->gd->queue = ramdrv_ramdrv_dev->queue;
-  ramdrv_ramdrv_dev->gd->private_data = (void*)ramdrv_ramdrv_dev;
-  snprintf(ramdrv_ramdrv_dev->gd->disk_name, 32, "ramdrv");
-
-  set_capacity(ramdrv_ramdrv_dev->gd, sector_count);
-  add_disk(ramdrv_ramdrv_dev->gd);
+  ramdrv_device_init(ramdrv_ramdrv_dev, 0);
 
   //finished
-  printk(KERN_NOTICE "ramdrv: module installed\n");
-  goto out;
-
-  vfree_out:
-  vfree(ramdrv_ramdrv_dev->data);
+  printk(KERN_INFO "ramdrv: module installed\n");
 
   out:
   return ret;

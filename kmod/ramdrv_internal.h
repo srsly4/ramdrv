@@ -11,13 +11,13 @@
 #define DEVNUM(kdevnum)	(MINOR(kdev_t_to_nr(kdevnum)) >> MINOR_SHIFT
 
 struct ramdrv_dev {
-        int size;                       /* Device size in sectors */
-        u8 *data;                       /* The data array */
-        short users;                    /* How many users */
-        short media_change;             /* Flag a media change? */
-        spinlock_t lock;                /* For mutual exclusion */
-        struct request_queue *queue;    /* The device request queue */
-        struct gendisk *gd;             /* The gendisk structure */
+        int size; //device size in bytes (only KERNEL_SECTOR_SIZE)
+        u8 *data; //pointer to vmalloc'ed data
+        short users; //curent device users
+        spinlock_t lock; //dev async lock
+        struct request_queue *queue; //request queue
+        struct gendisk *gd; //linked gendisk
+        struct ramdrv_dev *next; //linked-list pointer
 };
 
 #endif
