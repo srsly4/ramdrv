@@ -29,57 +29,45 @@ module_param(sector_count, int, 0);
 // block device major number
 static int blkdev_id;
 
-static int bytes_to_sectors_checked(unsigned long bytes)
-{
-	if( bytes % KERNEL_SECTOR_SIZE )
-	{
-		printk("***************WhatTheFuck***********************\n");
-	}
+static int bytes_to_sectors_checked(unsigned long bytes) {
+	if (bytes % KERNEL_SECTOR_SIZE)
+		printk(KERN_WARNING "ramdrv: incorrect byte sector align!\n");
 	return bytes / KERNEL_SECTOR_SIZE;
 }
 
+// Device open handler
 static int sbull_open(struct block_device *dev, fmode_t mode){
-  struct sbull_dev *sdev;
-  printk(KERN_NOTICE "sbull opening!\n");
-  sdev = dev->bd_disk->private_data;
-  printk(KERN_NOTICE "sbull opened!\n");
+  struct sbull_dev *opened_dev = dev->bd_disk->private_data;
 
-  /*spin_lock(&sdev->lock);
-  sdev->users++;
-  spin_unlock(&sdev->lock);*/
+  spin_lock(&opened_dev->lock);
+  opened_dev->users++;
+  spin_unlock(&opened_dev->lock);
 
   return 0;
 }
 
+// Device close handler
 static void sbull_release(struct gendisk *disk, fmode_t mode){
-  struct sbull_dev *sdev;
-  printk(KERN_NOTICE "sbull releasing!\n");
-  sdev = disk->private_data;
-  printk(KERN_NOTICE "sbull released!\n");
+  struct sbull_dev *dev = disk->private_data;
 
-  /*spin_lock(&sdev->lock);
-  sdev->users--;
-
-  spin_unlock(&sdev->lock);*/
+  spin_lock(&dev->lock);
+  dev->users--;
+  spin_unlock(&dev->lock);
 }
 
-static int sbull_media_changed(struct gendisk *gd){
-  return 0;
-}
+// For Ramdrive media will never change as it's not a removable device
+static int sbull_media_changed(struct gendisk *gd){ return 0; }
+static int sbull_revalidate(struct gendisk *gd){ return 0; }
 
-static int sbull_revalidate(struct gendisk *gd){
-  return 0;
-}
-
-
+// Driver IOCTL handler
 static int sbull_ioctl(struct block_device *dev, fmode_t mode,
                         unsigned cmd, unsigned long arg){
-  //struct sbull_dev* sdev = dev->bd_disk->private_data;
   struct hd_geometry disk_geometry;
-  printk(KERN_NOTICE "ramdrv: ioctl command!\n");
+
   switch(cmd){
+    //fake hard drive geometry for compability issues
     case HDIO_GETGEO:
-    printk(KERN_NOTICE "ramdrv: getting geometry info\n");
+    printk(KERN_NOTICE "ramdrv: getting faked geometry info\n");
     disk_geometry.cylinders = 512;
     disk_geometry.heads = 4;
     disk_geometry.sectors = 16;
@@ -92,7 +80,7 @@ static int sbull_ioctl(struct block_device *dev, fmode_t mode,
   return -ENOTTY;
 }
 
-// Device transfer request delivery
+// Actuall device transfer function
 static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
         unsigned long nsect, char *buffer, int write) {
   unsigned long offset = sector*KERNEL_SECTOR_SIZE;
@@ -128,54 +116,10 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 
 
 /*
- * Transfer a full request.
- */
-static int sbull_xfer_request(struct sbull_dev *dev, struct request *req)
-{
-	struct bio *bio;
-	int nsect = 0;
-
-	__rq_for_each_bio(bio, req) {
-		sbull_xfer_bio(dev, bio);
-		nsect += bio->bi_iter.bi_size/KERNEL_SECTOR_SIZE;
-	}
-	return nsect;
-}
-
-
-
-/*
- * Smarter request function that "handles clustering".
- */
-static void sbull_full_request(struct request_queue *q)
-{
-	struct request *req;
-	struct sbull_dev *dev = q->queuedata;
-	int ret;
-
-	while ((req = blk_fetch_request(q)) != NULL) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
-    if (req == NULL || (!(req->cmd_flags & REQ_OP_WRITE) && !(req->cmd_flags & REQ_OP_READ))) { //if it's not from-disk or to-disk request
-#else
-    if (req == NULL || req->cmd_type != REQ_TYPE_FS) {
-#endif
-			printk (KERN_NOTICE "Skip non-fs request\n");
-			ret = -EIO;
-			goto done;
-		}
-		sbull_xfer_request(dev, req);
-		ret = 0;
-	done:
-		__blk_end_request_all(req, ret);
-	}
-}
-
-
-
-/*
  * The direct make request version.
+ * From Linux 4.4.0 API of elv make_request handler has changed
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 static blk_qc_t sbull_make_request(struct request_queue *q, struct bio *bio)
 #else
 static void sbull_make_request(struct request_queue *q, struct bio *bio)
@@ -185,46 +129,16 @@ static void sbull_make_request(struct request_queue *q, struct bio *bio)
 	int status;
 
 	status = sbull_xfer_bio(dev, bio);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 	bio->bi_error = status;
   bio_endio(bio);
 #else
   bio_endio(bio, status);
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 	return BLK_QC_T_NONE;
 #endif
-}
-
-// Device request handler (simple form)
-static void sbull_request(struct request_queue *queue){
-  struct request *req;
-  struct sbull_dev *dev;
-  int ret;
-  //get anything from the queue
-  while ((req = blk_fetch_request(queue)) != NULL){
-    printk(KERN_NOTICE "Fetched request\n");
-    dev = req->rq_disk->private_data;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
-    if (req == NULL || (!(req->cmd_flags & REQ_OP_WRITE) && !(req->cmd_flags & REQ_OP_READ))) { //if it's not from-disk or to-disk request
-#else
-    if (req == NULL || req->cmd_type != REQ_TYPE_FS) {
-#endif
-      printk(KERN_NOTICE "Skipped non-fs request \n");
-      ret = -EIO;
-      goto done;
-    }
-    //move the data
-    printk(KERN_NOTICE "Normal request\n");
-    sbull_transfer(dev, blk_rq_pos(req), blk_rq_cur_sectors(req), bio_data(req->bio), rq_data_dir(req));
-    ret = 0;
-
-    done:
-    if (!__blk_end_request_cur(req, ret)){
-			req = blk_fetch_request(queue);
-		}
-  }
 }
 
 // Device operations handler
