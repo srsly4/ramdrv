@@ -20,3 +20,4 @@ userprog/hwuser
 userprog/Makefile
 cmake_install.cmake
 *.cmake
+Makefile

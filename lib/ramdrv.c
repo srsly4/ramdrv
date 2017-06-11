@@ -14,24 +14,28 @@
 #include <ramdrv.h>
 
 
-int ramdrv_create(int sectors){
-  int ret = 0;
-  ramdrv_ioctl_create_t args;
-  memset(&args, 0, sizeof(args));
+int ramdrv_open(void) {
+
+    int fd = open("/dev/ramdrv", 'r');
+
+    if (fd < 0)
+        return -fd;
+
+    return fd;
 }
 
 
-int ramdrv_inc(int hw_fd){
-
+int ramdrv_close(int fd) {
     int ret = 0;
-
-    ramdrv_ioctl_inc_t ioctl_args;
-
-    memset(&ioctl_args, 0, sizeof(ioctl_args));
-
-    ioctl_args.placeholder = LIBRAMDRV_MAGIC;
-
-    ret = ioctl(hw_fd, RAMDRV_IOCTL_INCREMENT, &ioctl_args);
-
+    ret = close(fd);
     return ret;
+}
+
+int ramdrv_create(int fd){
+  int ret = 0;
+  ramdrv_ioctl_create_t args;
+  memset(&args, 0, sizeof(args));
+  args.sectors = 1000;
+  ret = ioctl(fd, RAMDRV_IOCTL_CREATE, &args);
+  return ret;
 }

@@ -44,6 +44,7 @@ typedef union ramdrv_ioctl_param_u {
  * (hopefully) unique constants used for IOCTL command values.
  */
 #define RAMDRV_IOCTL_INCREMENT	   _IOW(RAMDRV_MAGIC, 1, ramdrv_ioctl_inc_t)
-#define RAMDRV_IOCTL_CREATE _IOW(RAMDRV_MAGIC, 2, ramdr_ioctl_create_t)
+#define RAMDRV_IOCTL_CREATE _IOW(RAMDRV_MAGIC, 2, ramdrv_ioctl_create_t)
 
+#define RAMDRV_IOC_MAX 2
 #endif /* RAMDRV_H */

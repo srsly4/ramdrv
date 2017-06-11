@@ -64,10 +64,34 @@ ssize_t cntl_read(struct file *f, char* user_buffer, size_t count, loff_t *posit
     return count;
 }
 
+static long cntl_ioctl(struct file *file,
+                        unsigned cmd, unsigned long arg){
+  long res = 0, err = 0;
+  if (_IOC_TYPE(cmd) != RAMDRV_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > RAMDRV_IOC_MAX) return -ENOTTY;
+
+  if (_IOC_DIR(cmd) & _IOC_READ)
+  		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+  	else if (_IOC_DIR(cmd) & _IOC_WRITE)
+  		err =  !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+  	if (err) return -EFAULT;
+
+  switch(cmd){
+    case RAMDRV_IOCTL_CREATE: //create ramdrive
+      printk(KERN_INFO "ramdrv: yeah!\n");
+    break;
+
+    default:
+      return -ENOTTY;
+  }
+
+  return res;
+}
 
 struct file_operations cntl_file_operations = {
   .owner = THIS_MODULE,
-  .read = cntl_read
+  .read = cntl_read,
+  .unlocked_ioctl = cntl_ioctl
 };
 
 

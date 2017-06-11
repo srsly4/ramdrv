@@ -1,4 +1,3 @@
-ADD_EXECUTABLE(hwuser hwuser.c)
+ADD_EXECUTABLE(ramctl ramctl.c)
 
-TARGET_LINK_LIBRARIES(hwuser ramdrv)
-
+TARGET_LINK_LIBRARIES(ramctl ramdrv)
