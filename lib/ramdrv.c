@@ -19,7 +19,7 @@ int ramdrv_open(void) {
     int fd = open("/dev/ramdrv", 'w');
 
     if (fd < 0)
-        return -fd;
+        return fd;
 
     return fd;
 }
