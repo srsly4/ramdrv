@@ -58,7 +58,7 @@ int main(int argc, char** argv){
       exit(EXIT_FAILURE);
     }
   }
-  else if (strcmp(argv[2], "delete") == 0){
+  else if (strcmp(argv[1], "delete") == 0){
     if (num > 15){
       fprintf(stderr, "Invalid device number.\n");
       exit(EXIT_FAILURE);
