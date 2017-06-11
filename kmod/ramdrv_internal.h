@@ -3,6 +3,7 @@
 
 #define RAMDRV_MODULE_NAME "ramdrv"
 #define RAMDRV_BLKDEV_NAME "ramdrv"
+#define RAMDRV_CNTLDEV_NAME "ramdrv_ctl"
 
 #define KERNEL_SECTOR_SIZE 512
 

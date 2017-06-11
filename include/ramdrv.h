@@ -3,11 +3,7 @@
 
 #define LIBRAMDRV_MAGIC 0xd34db33f
 
-extern int ramdrv_open(void);
-
-extern int ramdrv_close(int fd);
-
-extern int ramdrv_inc(int fd);
+extern int ramdrv_create(int size);
 
 
 #endif /* LIBRAMDRV_H */

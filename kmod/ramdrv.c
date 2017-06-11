@@ -25,6 +25,52 @@
 static int sector_count = 65536; // 128MB
 module_param(sector_count, int, 0);
 
+/* ramdrv device definition */
+static struct ramdrv_dev **devices;
+
+// control device id
+static int cntldev_id;
+static char* cntldev_buff;
+static size_t cntldev_buffsize;
+
+void cntl_refresh_buff(void){
+  int i = 0, devs = 0;
+  if (cntldev_buff == NULL){
+    cntldev_buff = kmalloc(128, GFP_KERNEL);
+  }
+
+  for (i = 0; i < RAMDRV_MINORS; i++){
+    if (devices[i] != NULL){
+      devs++;
+    }
+  }
+
+  snprintf(cntldev_buff, 128, "ramdrv current devices: %d\n", devs);
+  cntldev_buffsize = strlen(cntldev_buff+1);
+}
+
+//control function read - list of current ram drives
+ssize_t cntl_read(struct file *f, char* user_buffer, size_t count, loff_t *position){
+  if (cntldev_buff == NULL) return 0; //EOF
+  if (*position >= cntldev_buffsize)
+        return 0;
+    /* If a user tries to read more than we have, read only as many bytes as we have */
+  if (*position + count > cntldev_buffsize)
+      count = cntldev_buffsize - *position;
+  if( copy_to_user(user_buffer, cntldev_buff + *position, count) != 0 )
+      return -EFAULT;
+
+    *position += count;
+    return count;
+}
+
+
+struct file_operations cntl_file_operations = {
+  .owner = THIS_MODULE,
+  .read = cntl_read
+};
+
+
 
 // block device major number
 static int blkdev_id;
@@ -151,10 +197,6 @@ static struct block_device_operations ramdrv_blkops = {
 	.ioctl= ramdrv_ioctl
 };
 
-
-/* ramdrv device definition */
-static struct ramdrv_dev **devices;
-
 static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors, int device_ndx){
   if (device_ndx >= RAMDRV_MINORS){
     printk(KERN_WARNING "ramdrv: cannot create more than 16 drives\n");
@@ -207,7 +249,7 @@ vfree_out:
 }
 
 static void ramdrv_device_destroy(int ndx){
-  printk(KERN_NOTICE "device %s has been destroyed\n", devices[ndx]->gd->disk_name);
+  printk(KERN_NOTICE "ramdrv: device %s has been destroyed\n", devices[ndx]->gd->disk_name);
   if (devices[ndx]->gd){
     del_gendisk(devices[ndx]->gd);
     put_disk(devices[ndx]->gd);
@@ -225,11 +267,20 @@ static void ramdrv_device_destroy(int ndx){
 /* Module initialization */
 static int __init ramdrv_init(void) {
   int ret = 0;
+  cntldev_buff = NULL;
+  cntldev_buffsize = 0;
+
+  //register control device
+  cntldev_id = register_chrdev(0, RAMDRV_CNTLDEV_NAME, &cntl_file_operations);
+  if (cntldev_id < 0){
+    printk(KERN_ERR "ramdrv: unable to register control character device\n");
+    goto out;
+  }
 
   // register block device
   blkdev_id = register_blkdev(0, RAMDRV_BLKDEV_NAME);
   if (blkdev_id < 0){
-    printk(KERN_ERR "ramdrv: unable to register block device.\n");
+    printk(KERN_ERR "ramdrv: unable to register block device\n");
     goto out;
   }
   printk(KERN_INFO "ramdrv: initialized block device\n");
@@ -238,10 +289,10 @@ static int __init ramdrv_init(void) {
   devices = kmalloc(RAMDRV_MINORS * sizeof(struct ramdrv_dev*), GFP_KERNEL);
   memset(devices, 0, RAMDRV_MINORS * sizeof(struct ramdrv_dev*));
 
-
   devices[0] = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
   ramdrv_device_init(devices[0], sector_count, 0);
 
+  cntl_refresh_buff();
   //finished
   printk(KERN_INFO "ramdrv: module installed\n");
 
@@ -249,7 +300,7 @@ static int __init ramdrv_init(void) {
   return ret;
 }
 
-/* uninitialziation callback */
+/* Module uninitialziation */
 static void __exit ramdrv_exit(void) {
   int ndx = 0;
   //dealloc each device
@@ -259,14 +310,15 @@ static void __exit ramdrv_exit(void) {
   }
 
   unregister_blkdev(blkdev_id, RAMDRV_BLKDEV_NAME);
+  unregister_chrdev(cntldev_id, RAMDRV_CNTLDEV_NAME);
   kfree(devices);
 
-  printk(KERN_NOTICE "ramdrv module uninstalled\n");
+  printk(KERN_NOTICE "ramdrv: module uninstalled\n");
 }
 
 module_init(ramdrv_init);
 module_exit(ramdrv_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Sample Ram Drive module");
+MODULE_DESCRIPTION("Simple Ram Drive module");
 MODULE_AUTHOR("Szymon Piechaczek");

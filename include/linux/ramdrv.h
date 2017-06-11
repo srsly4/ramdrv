@@ -14,13 +14,18 @@ typedef struct ramdrv_ioctl_inc_s {
     int placeholder;
 } ramdrv_ioctl_inc_t;
 
+typedef struct ramdrv_ioctl_create_s {
+  int sectors;
+} ramdrv_ioctl_create_t;
+
 /*
  * This generic union allows us to make a more generic IOCTRL call
  * interface. Each per-IOCTL-flavor struct should be a member of this
  * union.
  */
 typedef union ramdrv_ioctl_param_u {
-    ramdrv_ioctl_inc_t      set;
+    ramdrv_ioctl_inc_t set;
+    ramdrv_ioctl_create_t create;
 } ramdrv_ioctl_param_union;
 
 
@@ -39,6 +44,6 @@ typedef union ramdrv_ioctl_param_u {
  * (hopefully) unique constants used for IOCTL command values.
  */
 #define RAMDRV_IOCTL_INCREMENT	   _IOW(RAMDRV_MAGIC, 1, ramdrv_ioctl_inc_t)
-
+#define RAMDRV_IOCTL_CREATE _IOW(RAMDRV_MAGIC, 2, ramdr_ioctl_create_t)
 
 #endif /* RAMDRV_H */

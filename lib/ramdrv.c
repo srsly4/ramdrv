@@ -14,22 +14,10 @@
 #include <ramdrv.h>
 
 
-int ramdrv_open(void) {
-
-    int fd = open("/dev/ramdrv", 'w');
-
-    if (fd < 0)
-        return -fd;
-
-    return fd;
-}
-
-
-int ramdrv_close(int fd) {
-
-    int ret = 0;
-    ret = close(fd);
-    return ret;
+int ramdrv_create(int sectors){
+  int ret = 0;
+  ramdrv_ioctl_create_t args;
+  memset(&args, 0, sizeof(args));
 }
 
 
