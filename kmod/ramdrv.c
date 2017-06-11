@@ -36,8 +36,8 @@ static int bytes_to_sectors_checked(unsigned long bytes) {
 }
 
 // Device open handler
-static int sbull_open(struct block_device *dev, fmode_t mode){
-  struct sbull_dev *opened_dev = dev->bd_disk->private_data;
+static int ramdrv_open(struct block_device *dev, fmode_t mode){
+  struct ramdrv_dev *opened_dev = dev->bd_disk->private_data;
 
   spin_lock(&opened_dev->lock);
   opened_dev->users++;
@@ -47,8 +47,8 @@ static int sbull_open(struct block_device *dev, fmode_t mode){
 }
 
 // Device close handler
-static void sbull_release(struct gendisk *disk, fmode_t mode){
-  struct sbull_dev *dev = disk->private_data;
+static void ramdrv_release(struct gendisk *disk, fmode_t mode){
+  struct ramdrv_dev *dev = disk->private_data;
 
   spin_lock(&dev->lock);
   dev->users--;
@@ -56,11 +56,11 @@ static void sbull_release(struct gendisk *disk, fmode_t mode){
 }
 
 // For Ramdrive media will never change as it's not a removable device
-static int sbull_media_changed(struct gendisk *gd){ return 0; }
-static int sbull_revalidate(struct gendisk *gd){ return 0; }
+static int ramdrv_media_changed(struct gendisk *gd){ return 0; }
+static int ramdrv_revalidate(struct gendisk *gd){ return 0; }
 
 // Driver IOCTL handler
-static int sbull_ioctl(struct block_device *dev, fmode_t mode,
+static int ramdrv_ioctl(struct block_device *dev, fmode_t mode,
                         unsigned cmd, unsigned long arg){
   struct hd_geometry disk_geometry;
 
@@ -81,7 +81,7 @@ static int sbull_ioctl(struct block_device *dev, fmode_t mode,
 }
 
 // Actuall device transfer function
-static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
+static void ramdrv_transfer(struct ramdrv_dev *dev, unsigned long sector,
         unsigned long nsect, char *buffer, int write) {
   unsigned long offset = sector*KERNEL_SECTOR_SIZE;
   unsigned long nbytes = nsect*KERNEL_SECTOR_SIZE;
@@ -97,7 +97,7 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 }
 
 
-static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
+static int ramdrv_xfer_bio(struct ramdrv_dev *dev, struct bio *bio)
 {
 	struct bio_vec bvec;
 	struct bvec_iter iter;
@@ -106,7 +106,7 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 	/* Do each segment independently. */
 	bio_for_each_segment(bvec, bio, iter) {
 		char *buffer = __bio_kmap_atomic(bio, iter);
-		sbull_transfer(dev, sector,bytes_to_sectors_checked(bio_cur_bytes(bio)),
+		ramdrv_transfer(dev, sector,bytes_to_sectors_checked(bio_cur_bytes(bio)),
 				buffer, bio_data_dir(bio) == WRITE);
 		sector += (bytes_to_sectors_checked(bio_cur_bytes(bio)));
 		__bio_kunmap_atomic(bio);
@@ -120,15 +120,15 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
  * From Linux 4.4.0 API of elv make_request handler has changed
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
-static blk_qc_t sbull_make_request(struct request_queue *q, struct bio *bio)
+static blk_qc_t ramdrv_make_request(struct request_queue *q, struct bio *bio)
 #else
-static void sbull_make_request(struct request_queue *q, struct bio *bio)
+static void ramdrv_make_request(struct request_queue *q, struct bio *bio)
 #endif
 {
-	struct sbull_dev *dev = q->queuedata;
+	struct ramdrv_dev *dev = q->queuedata;
 	int status;
 
-	status = sbull_xfer_bio(dev, bio);
+	status = ramdrv_xfer_bio(dev, bio);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 	bio->bi_error = status;
   bio_endio(bio);
@@ -144,19 +144,18 @@ static void sbull_make_request(struct request_queue *q, struct bio *bio)
 // Device operations handler
 static struct block_device_operations ramdrv_blkops = {
   .owner = THIS_MODULE,
-	.open = sbull_open,
-	.release = sbull_release,
-	.media_changed = sbull_media_changed,
-	.revalidate_disk = sbull_revalidate,
-	.ioctl= sbull_ioctl
+	.open = ramdrv_open,
+	.release = ramdrv_release,
+	.media_changed = ramdrv_media_changed,
+	.revalidate_disk = ramdrv_revalidate,
+	.ioctl= ramdrv_ioctl
 };
 
-/* === Driver initialization stuff ==== */
-/* Sbull device definition */
-static struct sbull_dev *ramdrv_sbull_dev;
 
+/* ramdrv device definition */
+static struct ramdrv_dev *ramdrv_ramdrv_dev;
 
-/* Driver init callback */
+/* Module initialization */
 static int __init ramdrv_init(void) {
   int ret = 0;
 
@@ -169,67 +168,67 @@ static int __init ramdrv_init(void) {
   printk(KERN_NOTICE "ramdrv: initialized block device\n");
 
 
-  //fill the sbull_dev struct
-  ramdrv_sbull_dev = kmalloc(sizeof(struct sbull_dev), GFP_KERNEL);
-  memset(ramdrv_sbull_dev, 0, sizeof(struct sbull_dev));
+  //fill the ramdrv_dev struct
+  ramdrv_ramdrv_dev = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
+  memset(ramdrv_ramdrv_dev, 0, sizeof(struct ramdrv_dev));
 
 
-  printk(KERN_NOTICE "ramdrv: initialized sbull struct\n");
+  printk(KERN_NOTICE "ramdrv: initialized ramdrv struct\n");
 
-  ramdrv_sbull_dev->media_change = 0;
-  ramdrv_sbull_dev->users = 0;
-  ramdrv_sbull_dev->size = sector_count * KERNEL_SECTOR_SIZE;
-  ramdrv_sbull_dev->data = vmalloc(ramdrv_sbull_dev->size); //allocate virtual disk size
+  ramdrv_ramdrv_dev->media_change = 0;
+  ramdrv_ramdrv_dev->users = 0;
+  ramdrv_ramdrv_dev->size = sector_count * KERNEL_SECTOR_SIZE;
+  ramdrv_ramdrv_dev->data = vmalloc(ramdrv_ramdrv_dev->size); //allocate virtual disk size
 
-  if (ramdrv_sbull_dev->data == NULL){
+  if (ramdrv_ramdrv_dev->data == NULL){
     printk(KERN_WARNING "ramdr: unable to valloc memory\n");
     goto vfree_out;
   }
   printk(KERN_NOTICE "ramdrv: valloced!\n");
 
-  spin_lock_init(&(ramdrv_sbull_dev->lock));
+  spin_lock_init(&(ramdrv_ramdrv_dev->lock));
 
   printk(KERN_NOTICE "ramdrv: spinlocked!\n");
 
-  ramdrv_sbull_dev->queue = blk_alloc_queue(GFP_KERNEL);
-	if (ramdrv_sbull_dev->queue == NULL)
+  ramdrv_ramdrv_dev->queue = blk_alloc_queue(GFP_KERNEL);
+	if (ramdrv_ramdrv_dev->queue == NULL)
 		goto vfree_out;
-	blk_queue_make_request(ramdrv_sbull_dev->queue, sbull_make_request);
+	blk_queue_make_request(ramdrv_ramdrv_dev->queue, ramdrv_make_request);
 
-  /*ramdrv_sbull_dev->queue = blk_init_queue(sbull_request, &(ramdrv_sbull_dev->lock));
-  if (!(ramdrv_sbull_dev->queue)){
+  /*ramdrv_ramdrv_dev->queue = blk_init_queue(ramdrv_request, &(ramdrv_ramdrv_dev->lock));
+  if (!(ramdrv_ramdrv_dev->queue)){
     printk(KERN_WARNING "ramdrv: unable to intialize request queue\n");
     goto vfree_out;
   }*/
-  //blk_queue_hardsect_size(ramdrv_sbull_dev->queue, logical_block_size);
-  blk_queue_logical_block_size(ramdrv_sbull_dev->queue, KERNEL_SECTOR_SIZE);
-	ramdrv_sbull_dev->queue->queuedata = ramdrv_sbull_dev;
+  //blk_queue_hardsect_size(ramdrv_ramdrv_dev->queue, logical_block_size);
+  blk_queue_logical_block_size(ramdrv_ramdrv_dev->queue, KERNEL_SECTOR_SIZE);
+	ramdrv_ramdrv_dev->queue->queuedata = ramdrv_ramdrv_dev;
 
-  printk(KERN_NOTICE "ramdrv: initialized sbull_dev\n");
+  printk(KERN_NOTICE "ramdrv: initialized ramdrv_dev\n");
 
   //gendisk initialization
-  ramdrv_sbull_dev->gd = alloc_disk(1);
-  if (!ramdrv_sbull_dev->gd) {
+  ramdrv_ramdrv_dev->gd = alloc_disk(1);
+  if (!ramdrv_ramdrv_dev->gd) {
     printk(KERN_WARNING "alloc_disk failure\n");
     goto vfree_out;
   }
 
-  ramdrv_sbull_dev->gd->major = blkdev_id;
-  ramdrv_sbull_dev->gd->first_minor = 0;
-  ramdrv_sbull_dev->gd->fops = &ramdrv_blkops;
-  ramdrv_sbull_dev->gd->queue = ramdrv_sbull_dev->queue;
-  ramdrv_sbull_dev->gd->private_data = (void*)ramdrv_sbull_dev;
-  snprintf(ramdrv_sbull_dev->gd->disk_name, 32, "ramdrv");
+  ramdrv_ramdrv_dev->gd->major = blkdev_id;
+  ramdrv_ramdrv_dev->gd->first_minor = 0;
+  ramdrv_ramdrv_dev->gd->fops = &ramdrv_blkops;
+  ramdrv_ramdrv_dev->gd->queue = ramdrv_ramdrv_dev->queue;
+  ramdrv_ramdrv_dev->gd->private_data = (void*)ramdrv_ramdrv_dev;
+  snprintf(ramdrv_ramdrv_dev->gd->disk_name, 32, "ramdrv");
 
-  set_capacity(ramdrv_sbull_dev->gd, sector_count);
-  add_disk(ramdrv_sbull_dev->gd);
+  set_capacity(ramdrv_ramdrv_dev->gd, sector_count);
+  add_disk(ramdrv_ramdrv_dev->gd);
 
   //finished
   printk(KERN_NOTICE "ramdrv: module installed\n");
   goto out;
 
   vfree_out:
-  vfree(ramdrv_sbull_dev->data);
+  vfree(ramdrv_ramdrv_dev->data);
 
   out:
   return ret;
@@ -237,20 +236,20 @@ static int __init ramdrv_init(void) {
 
 /* uninitialziation callback */
 static void __exit ramdrv_exit(void) {
-  if (ramdrv_sbull_dev->gd){
-    del_gendisk(ramdrv_sbull_dev->gd);
-    put_disk(ramdrv_sbull_dev->gd);
+  if (ramdrv_ramdrv_dev->gd){
+    del_gendisk(ramdrv_ramdrv_dev->gd);
+    put_disk(ramdrv_ramdrv_dev->gd);
   }
-  if (ramdrv_sbull_dev->queue) {
-    blk_cleanup_queue(ramdrv_sbull_dev->queue);
+  if (ramdrv_ramdrv_dev->queue) {
+    blk_cleanup_queue(ramdrv_ramdrv_dev->queue);
   }
-  if (ramdrv_sbull_dev->data){
-    vfree(ramdrv_sbull_dev->data);
+  if (ramdrv_ramdrv_dev->data){
+    vfree(ramdrv_ramdrv_dev->data);
     printk(KERN_NOTICE "ramdrv data destroyed\n");
   }
 
   unregister_blkdev(blkdev_id, RAMDRV_BLKDEV_NAME);
-  kfree(ramdrv_sbull_dev);
+  kfree(ramdrv_ramdrv_dev);
 
   printk(KERN_NOTICE "ramdrv module uninstalled\n");
 }

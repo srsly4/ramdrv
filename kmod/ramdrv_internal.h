@@ -6,13 +6,11 @@
 
 #define KERNEL_SECTOR_SIZE 512
 
-#define SBULL_MINORS	16
+#define RAMDRV_MINORS	16
 #define MINOR_SHIFT	4
 #define DEVNUM(kdevnum)	(MINOR(kdev_t_to_nr(kdevnum)) >> MINOR_SHIFT
 
-#define INVALIDATE_DELAY	30*HZ
-
-struct sbull_dev {
+struct ramdrv_dev {
         int size;                       /* Device size in sectors */
         u8 *data;                       /* The data array */
         short users;                    /* How many users */
