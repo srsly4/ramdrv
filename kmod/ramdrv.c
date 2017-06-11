@@ -178,7 +178,7 @@ static void sbull_full_request(struct request_queue *q)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
 static blk_qc_t sbull_make_request(struct request_queue *q, struct bio *bio)
 #else
-static void sbull_make_request(struct request_queue *q, struct *bio)
+static void sbull_make_request(struct request_queue *q, struct bio *bio)
 #endif
 {
 	struct sbull_dev *dev = q->queuedata;
@@ -187,9 +187,11 @@ static void sbull_make_request(struct request_queue *q, struct *bio)
 	status = sbull_xfer_bio(dev, bio);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
 	bio->bi_error = status;
+  bio_endio(bio);
+#else
+  bio_endio(bio, status);
 #endif
 
-	bio_endio(bio);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
 	return BLK_QC_T_NONE;
 #endif
