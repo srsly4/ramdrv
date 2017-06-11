@@ -27,9 +27,9 @@ int main(int argc, char** argv){
       exit(EXIT_FAILURE);
   }
 
-  i = ramdrv_create(fd);
+  i = ramdrv_create(fd, 131072);
   printf("ramdrv_create returned: %d\n", i);
-  
+
   ramdrv_close(fd);
   exit(EXIT_SUCCESS);
 }
