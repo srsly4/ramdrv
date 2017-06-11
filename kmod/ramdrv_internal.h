@@ -17,7 +17,6 @@ struct ramdrv_dev {
         spinlock_t lock; //dev async lock
         struct request_queue *queue; //request queue
         struct gendisk *gd; //linked gendisk
-        struct ramdrv_dev *next; //linked-list pointer
 };
 
 #endif

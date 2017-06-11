@@ -153,10 +153,14 @@ static struct block_device_operations ramdrv_blkops = {
 
 
 /* ramdrv device definition */
-static struct ramdrv_dev *ramdrv_ramdrv_dev;
-static int ramdrv_next_index;
+static struct ramdrv_dev **devices;
 
-static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors){
+static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors, int device_ndx){
+  if (device_ndx >= RAMDRV_MINORS){
+    printk(KERN_WARNING "ramdrv: cannot create more than 16 drives\n");
+    return -1;
+  }
+
   //fill data with zeros
   memset(dev, 0, sizeof(struct ramdrv_dev));
 
@@ -183,11 +187,11 @@ static int ramdrv_device_init(struct ramdrv_dev *dev, int sectors){
   }
 
   dev->gd->major = blkdev_id;
-  dev->gd->first_minor = ramdrv_next_index*RAMDRV_MINORS;
+  dev->gd->first_minor = device_ndx*RAMDRV_MINORS;
   dev->gd->fops = &ramdrv_blkops;
   dev->gd->queue = dev->queue;
   dev->gd->private_data = (void*)dev;
-  snprintf(dev->gd->disk_name, 32, "ramdrv%c", ramdrv_next_index+'0');
+  snprintf(dev->gd->disk_name, 32, "ramdrv%c", device_ndx+'0');
 
   set_capacity(dev->gd, sectors);
   add_disk(dev->gd);
@@ -205,7 +209,6 @@ vfree_out:
 /* Module initialization */
 static int __init ramdrv_init(void) {
   int ret = 0;
-  ramdrv_next_index = 0;
 
   // register block device
   blkdev_id = register_blkdev(0, RAMDRV_BLKDEV_NAME);
@@ -215,10 +218,13 @@ static int __init ramdrv_init(void) {
   }
   printk(KERN_INFO "ramdrv: initialized block device\n");
 
+  //allocate table of devices with nulls
+  devices = kmalloc(RAMDRV_MINORS * sizeof(struct ramdrv_dev*), GFP_KERNEL);
+  memset(devices, 0, RAMDRV_MINORS * sizeof(struct ramdrv_dev*));
 
-  //fill the ramdrv_dev struct
-  ramdrv_ramdrv_dev = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
-  ramdrv_device_init(ramdrv_ramdrv_dev, sector_count);
+
+  devices[0] = kmalloc(sizeof(struct ramdrv_dev), GFP_KERNEL);
+  ramdrv_device_init(devices[0], sector_count, 0);
 
   //finished
   printk(KERN_INFO "ramdrv: module installed\n");
@@ -229,20 +235,26 @@ static int __init ramdrv_init(void) {
 
 /* uninitialziation callback */
 static void __exit ramdrv_exit(void) {
-  if (ramdrv_ramdrv_dev->gd){
-    del_gendisk(ramdrv_ramdrv_dev->gd);
-    put_disk(ramdrv_ramdrv_dev->gd);
-  }
-  if (ramdrv_ramdrv_dev->queue) {
-    blk_cleanup_queue(ramdrv_ramdrv_dev->queue);
-  }
-  if (ramdrv_ramdrv_dev->data){
-    vfree(ramdrv_ramdrv_dev->data);
-    printk(KERN_NOTICE "ramdrv data destroyed\n");
+  int ndx = 0;
+  //dealloc each device
+  for (ndx = 0; ndx < RAMDRV_MINORS; ndx++){
+    if (devices[0] == NULL) continue;
+    printk(KERN_NOTICE "device %s has been destroyed\n", devices[0]->gd->disk_name);
+    if (devices[0]->gd){
+      del_gendisk(devices[0]->gd);
+      put_disk(devices[0]->gd);
+    }
+    if (devices[0]->queue) {
+      blk_cleanup_queue(devices[0]->queue);
+    }
+    if (devices[0]->data){
+      vfree(devices[0]->data);
+    }
+    kfree(devices[0]);
   }
 
   unregister_blkdev(blkdev_id, RAMDRV_BLKDEV_NAME);
-  kfree(ramdrv_ramdrv_dev);
+  kfree(devices);
 
   printk(KERN_NOTICE "ramdrv module uninstalled\n");
 }
