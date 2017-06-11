@@ -276,6 +276,7 @@ static int __init ramdrv_init(void) {
     printk(KERN_ERR "ramdrv: unable to register control character device\n");
     goto out;
   }
+  printk(KERN_INFO "ramdrv: initialized control device\n");
 
   // register block device
   blkdev_id = register_blkdev(0, RAMDRV_BLKDEV_NAME);
