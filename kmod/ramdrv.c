@@ -148,15 +148,18 @@ static int ramdrv_xfer_bio(struct ramdrv_dev *dev, struct bio *bio)
 	struct bvec_iter iter;
 	sector_t sector = bio->bi_iter.bi_sector;
 
-	/* Do each segment independently. */
+	// for each bio segment
 	bio_for_each_segment(bvec, bio, iter) {
 		char *buffer = __bio_kmap_atomic(bio, iter);
+    // .. do transfer
 		ramdrv_transfer(dev, sector,bytes_to_sectors_checked(bio_cur_bytes(bio)),
 				buffer, bio_data_dir(bio) == WRITE);
+
+    //increment sector count
 		sector += (bytes_to_sectors_checked(bio_cur_bytes(bio)));
 		__bio_kunmap_atomic(bio);
 	}
-	return 0; /* Always "succeed" */
+	return 0;
 }
 
 

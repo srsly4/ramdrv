@@ -8,8 +8,6 @@
 #define KERNEL_SECTOR_SIZE 512
 
 #define RAMDRV_MINORS	16
-#define MINOR_SHIFT	4
-#define DEVNUM(kdevnum)	(MINOR(kdev_t_to_nr(kdevnum)) >> MINOR_SHIFT
 
 struct ramdrv_dev {
         int size; //device size in bytes (only KERNEL_SECTOR_SIZE)

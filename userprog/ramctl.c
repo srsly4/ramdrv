@@ -1,8 +1,3 @@
-/*
- * helloworld user program
- *
- * Author: Dillon Hicks (hhicks@ittc.ku.edu)
- */
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
